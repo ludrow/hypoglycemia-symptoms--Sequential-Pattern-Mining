@@ -57,24 +57,39 @@ for(i in for_loop$code_id){
 df <- data.frame(code,qa,qb)
 
 cluster <- function(code_id, value){
-  
-  for(i in df$code)
-  {
-    if(i==code){
-      qa=1
-      qb=1
-      if(value<qa){
-        return('niska')}
-      else if(value>qb){
-        return('wysoka')}
-      else {
-        return('normalne')
-      }
+
+      qa=df[df$code==code_id,"qa"]
+      qb=df[df$code==code_id,"qb"]
+      if(length(qa)==0 || length(qb)==0 )
+        return(NA)
+
+      if(is.na(value))
+        return(NA)
+      if(is.null(value))
+        return(NA)
       
-    }
-  }
+      if(value<qa){
+        return('niski')
+        }
+      else if(value>qb){
+        return('wysoki')
+        }
+      else if(value>=qa & value<=qb){
+        return('normalny')
+        }
+      else{
+        return(NA)}
 }
-# apply(base.df, 1, function(x) cluster(base.df$code, base.df$value))
+
+base.df$value.level <- mapply(cluster, base.df$code_id, base.df$value)
+df <-base.df %>%
+  mutate(description = if_else(!is.na(value.level),paste(description_PL,"poziom", value.level), as.character(description_PL)))  %>%
+  select(patient_id, time_sek, description)
+new_id <- df %>%arrange(description) %>% distinct(description)
+new_id$id <- seq.int(nrow(new_id))
+df = inner_join(df, new_id)
+View(df)
+
 
 
 

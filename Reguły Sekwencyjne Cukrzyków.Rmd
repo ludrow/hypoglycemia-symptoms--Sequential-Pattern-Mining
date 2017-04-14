@@ -89,29 +89,55 @@ for(i in for_loop$code_id){
   qa = c(qa,  quantile(to_divide_tmp.df$value, c(0.20)))
   qb = c(qb,  quantile(to_divide_tmp.df$value, c(0.80)))
   code = c(code, i)
-
+  
 }
 df <- data.frame(code,qa,qb)
 
 cluster <- function(code_id, value){
-  
-  for(i in df$code)
-    {
-    if(i==code){
-      qa=1
-      qb=1
-      if(value<qa){
-        return('niska')}
-      else if(value>qb){
-        return('wysoka')}
-      else {
-        return('normalne')
-          }
-        
-      }
-    }
-  }
-# apply(base.df, 1, function(x) cluster(base.df$code, base.df$value))
 
+      qa=df[df$code==code_id,"qa"]
+      qb=df[df$code==code_id,"qb"]
+      if(length(qa)==0 || length(qb)==0 )
+        return(NA)
+
+      if(is.na(value))
+        return(NA)
+      if(is.null(value))
+        return(NA)
+      
+      if(value<qa){
+        return('niski')
+        }
+      else if(value>qb){
+        return('wysoki')
+        }
+      else if(value>=qa & value<=qb){
+        return('normalny')
+        }
+      else{
+        return(NA)}
+}
+
+base.df$value.level <- mapply(cluster, base.df$code_id, base.df$value)
+```
+## Po³¹czenie wartoœci zmiennych dla tego samego czasu
+Nastêpnie ³¹czone s¹ wartoœci wydarzeñ wraz z ich poziomami gdzie jest to aplikowalne:
+```{r}
+df <-base.df %>%
+  mutate(description = if_else(!is.na(value.level),paste(description_PL,"poziom", value.level), as.character(description_PL)))  %>%
+  select(patient_id, time_sek, description)
+```
+W celu u³atwieñ obliczeniowych nadane zosta³y nowe numery ID do ka¿dego po³¹czonego wydarzenia:
+```{r}
+new_id <- df %>%arrange(description) %>% distinct(description)
+new_id$id <- seq.int(nrow(new_id))
+
+head(new_id)
+
+```
+Tak przygotowane dane s¹ gotowe do dalszej analizy:
+```{r}
+df = inner_join(df, new_id)
+head(df)
 ```
 

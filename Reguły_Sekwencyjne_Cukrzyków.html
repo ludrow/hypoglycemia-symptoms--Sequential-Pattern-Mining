@@ -212,29 +212,73 @@ for(i in for_loop$code_id){
   qa = c(qa,  quantile(to_divide_tmp.df$value, c(0.20)))
   qb = c(qb,  quantile(to_divide_tmp.df$value, c(0.80)))
   code = c(code, i)
-
+  
 }
 df &lt;- data.frame(code,qa,qb)
 
 cluster &lt;- function(code_id, value){
-  
-  for(i in df$code)
-    {
-    if(i==code){
-      qa=1
-      qb=1
+
+      qa=df[df$code==code_id,&quot;qa&quot;]
+      qb=df[df$code==code_id,&quot;qb&quot;]
+      if(length(qa)==0 || length(qb)==0 )
+        return(NA)
+
+      if(is.na(value))
+        return(NA)
+      if(is.null(value))
+        return(NA)
+      
       if(value&lt;qa){
-        return('niska')}
+        return('niski')
+        }
       else if(value&gt;qb){
-        return('wysoka')}
-      else {
-        return('normalne')
-          }
-        
-      }
-    }
-  }
-# apply(base.df, 1, function(x) cluster(base.df$code, base.df$value))</code></pre>
+        return('wysoki')
+        }
+      else if(value&gt;=qa &amp; value&lt;=qb){
+        return('normalny')
+        }
+      else{
+        return(NA)}
+}
+
+base.df$value.level &lt;- mapply(cluster, base.df$code_id, base.df$value)</code></pre>
+</div>
+<div id="poaczenie-wartosci-zmiennych-dla-tego-samego-czasu" class="section level2">
+<h2>Połączenie wartości zmiennych dla tego samego czasu</h2>
+<p>Następnie łączone są wartości wydarzeń wraz z ich poziomami gdzie jest to aplikowalne:</p>
+<pre class="r"><code>df &lt;-base.df %&gt;%
+  mutate(description = if_else(!is.na(value.level),paste(description_PL,&quot;poziom&quot;, value.level), as.character(description_PL)))  %&gt;%
+  select(patient_id, time_sek, description)</code></pre>
+<p>W celu ułatwień obliczeniowych nadane zostały nowe numery ID do każdego połączonego wydarzenia:</p>
+<pre class="r"><code>new_id &lt;- df %&gt;%arrange(description) %&gt;% distinct(description)
+new_id$id &lt;- seq.int(nrow(new_id))
+
+head(new_id)</code></pre>
+<pre><code>##                                 description id
+## 1 Aktywność sportowa mniejsza niż zazwyczaj  1
+## 2  Aktywność sportowa większa niż zazwyczaj  2
+## 3           Dawka insuliny NPH poziom niski  3
+## 4        Dawka insuliny NPH poziom normalny  4
+## 5          Dawka insuliny NPH poziom wysoki  5
+## 6    Dawka insuliny regularnej poziom niski  6</code></pre>
+<p>Tak przygotowane dane są gotowe do dalszej analizy:</p>
+<pre class="r"><code>df = inner_join(df, new_id)</code></pre>
+<pre><code>## Joining, by = &quot;description&quot;</code></pre>
+<pre class="r"><code>head(df)</code></pre>
+<pre><code>##   patient_id time_sek
+## 1          1 96772141
+## 2          1 96772142
+## 3          1 96772143
+## 4          1 96800881
+## 5          1 96800882
+## 6          1 96821461
+##                                                          description id
+## 1 Pomiar zawartości glukozy we krwi przed śniadaniem poziom normalny 39
+## 2                          Dawka insuliny regularnej poziom normalny  7
+## 3                                 Dawka insuliny NPH poziom normalny  4
+## 4    Pomiar zawartości glukozy we krwi przed kolacją poziom normalny 29
+## 5                          Dawka insuliny regularnej poziom normalny  7
+## 6     Nieokreślony pomiar zawartości glukozy we krwi poziom normalny 15</code></pre>
 </div>
 
 
