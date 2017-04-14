@@ -1,10 +1,11 @@
 ---
-title: "Regu³y Sekwencyjne dla pacjentów chorych na cukrzycê"
+title: "Regu³y Sekwencyjne dla pacentów chorych na cukrzycê."
 author: "Ludwik Przyrowski, Adam Kolipiñski"
 date: "3 kwietnia 2017"
 output:
   html_document: default
   pdf_document: default
+
 ---
 ```{r setup, include=FALSE}
 #knitr::opts_chunk$set(cache=TRUE)
@@ -104,7 +105,7 @@ cluster <- function(code_id, value){
       else if(value>qb){
         return('wysoka')}
       else {
-        return('œrednia')
+        return('normalne')
           }
         
       }
@@ -113,3 +114,4 @@ cluster <- function(code_id, value){
 # apply(base.df, 1, function(x) cluster(base.df$code, base.df$value))
 
 ```
+
