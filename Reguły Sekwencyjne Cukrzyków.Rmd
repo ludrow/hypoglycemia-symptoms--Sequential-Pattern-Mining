@@ -1,0 +1,115 @@
+---
+title: "Regu³y Sekwencyjne dla pacjentów chorych na cukrzycê"
+author: "Ludwik Przyrowski, Adam Kolipiñski"
+date: "3 kwietnia 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(cache=TRUE)
+```
+
+## Opis i specyfika zadania
+
+W obliczeñ zostana u¿yte nastêpujace boblioteki:
+```{R, message=F}
+library(arules)
+library(arulesSequences)
+library(ggplot2)
+library(dplyr)
+```
+## Eksploracja danych wejœciowych
+Do zadania pos³u¿y³y dane wejœciowe ze zbioru UCI Machine Learning Repository (https://archive.ics.uci.edu/ml/datasets/Diabetes) opracowane pocz¹tkowo poprzez Michael Kahn, MD, PhD, Washington University, St. Louis, MO a nastêpnie przetworzone w Politechnice Warszawskiej na potrzeby laboratorium.
+```{R, message=FALSE, warning=FALSE}
+download.file('http://staff.ii.pw.edu.pl/~gprotazi/dydaktyka/dane/diab_trans.data', destfile = 'data/diab_trans.data')
+diab.df <- read.csv("data/diab_trans.data", header=TRUE, stringsAsFactors = FALSE)
+```
+Dane zawieraj¹ codzienne czynnoœci dla 70 pacjentów chorych na cukrzycê.
+```{R, }
+head(diab.df)
+```
+Dla lepszego zrozumienia danych zmiennej 'code' zosta³y przypisane opisy zdarzeñ
+```{R, message=FALSE}
+diab.df$code_id = as.numeric(substring(diab.df$code, 4,5))
+description.df <- read.csv('data/description.txt', header=TRUE)
+
+input.df <- inner_join(diab.df,description.df)
+head(select(input.df, code_id, description_PL))
+
+```
+
+Tylko niektóre typy wydarzeñ maj¹ znacz¹c¹ wartoœæ zmiennej 'value', w reszcie przypisana jest cyfra 0
+```{R, message=F}
+
+to_chunk.df = input.df %>% 
+  group_by(code_id) %>%
+  distinct(value) %>%
+  summarise(count=n()) %>%
+  filter(count>1)
+to_chunk.df$measure = TRUE 
+
+base.df <- left_join(input.df, to_chunk.df)
+dawka = c(33, 34, 35)
+base.df <- base.df %>% mutate(type = ifelse(measure==T, ifelse(code_id %in% dawka, 'dawka', 'pomiar'), 'wydarzenie'))
+to_chunk_temp.df = inner_join(description.df, to_chunk.df)
+as.vector(to_chunk_temp.df$description_PL)
+
+
+```
+
+## Podzielenie mierzalnych danych na kategorie
+```{R, message=F, warning=F}
+to_hist_pomiar.df <- base.df %>% na.omit() %>% filter(measure==TRUE, type=='pomiar')
+ggplot(to_hist_pomiar.df, aes(x=value, fill=description_PL))+geom_histogram()
+to_hist_dawka.df <- base.df %>% na.omit() %>% filter(measure==TRUE, type=='dawka')
+ggplot(to_hist_dawka.df, aes(x=value, fill=description_PL))+geom_histogram(binwidth = 1)+scale_x_continuous(limits = c(2,40))
+```
+
+Podzia³ wartoœci dawek i pomiaru krwi zosta³ wykonany na podstawie 20tego i 80tego precentyla. Wartoœci ponmiêdzy uznane zosta³y jako 'normalne', poni¿ej - 'niskie' a powy¿ej- 'wysokie'. Poni¿ej przyk³ad dla pomiaru glukozy we krwi przed kolacj¹:
+```{R,message=F, warning=F}
+to_hist.df <- base.df %>% na.omit() %>% filter(measure==TRUE, code_id==62)
+
+q <- quantile(to_hist.df$value, c(0.20, 0.80))
+
+ggplot(to_hist.df, aes(x=value))+geom_histogram()+geom_vline(xintercept = c(q[1], q[2]))
+```
+
+podzia³ zosta³ wykonany dla wszystkich kategorii które zawieraj¹ dane mierzalne
+```{R}
+to_divide.df <- base.df %>% na.omit() %>% filter(measure==TRUE)
+for_loop <- to_divide.df %>% distinct(code_id)
+qa = c()
+qb = c()
+code = c()
+
+for(i in for_loop$code_id){
+  to_divide_tmp.df <- base.df %>% na.omit() %>% filter(measure==TRUE, code_id==i)
+  qa = c(qa,  quantile(to_divide_tmp.df$value, c(0.20)))
+  qb = c(qb,  quantile(to_divide_tmp.df$value, c(0.80)))
+  code = c(code, i)
+
+}
+df <- data.frame(code,qa,qb)
+
+cluster <- function(code_id, value){
+  
+  for(i in df$code)
+    {
+    if(i==code){
+      qa=1
+      qb=1
+      if(value<qa){
+        return('niska')}
+      else if(value>qb){
+        return('wysoka')}
+      else {
+        return('œrednia')
+          }
+        
+      }
+    }
+  }
+# apply(base.df, 1, function(x) cluster(base.df$code, base.df$value))
+
+```
