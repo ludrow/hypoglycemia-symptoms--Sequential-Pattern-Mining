@@ -116,17 +116,16 @@ head(freqItem,30)
 #support=0.05: wsparcie ustawiamy doœæ nisko, ¿eby "z³apaæ" tak¿e regu³y zwi¹zane z wydarzeniami, które wydarzaj¹ siê rzadko
 #maxsize = 1 wszystkie "koszyki" to jednorazowe zdarzenia, dlatego mo¿na zastosowaæ maxsize=1
 #maxgap = 28800 w tym wypadku interesuj¹ nas zdarzenia, które wystêpuj¹ w zakresie 8 godzin
-#maxlen = 4 kompromis miêdzy liczb¹ wyszukanych regu³ a czasem wykonania algorytymu. 
-parametry = new ("SPparameter",support = 0.05, maxsize = 1, maxgap = 28800, maxlen = 4 )
+#maxlen = 4 zdarzenia w obrêbie max 8 godzin daj¹ ³¹czny zakres objawów w ramach doby, co wydaje siê rozs¹dn¹ granic¹ dla hipoglikemii 
+#maxwin - w algorytmie cspade pakietu arulesSequences ma status "disabled", dlatego nie mo¿emy go u¿yæ.
+parametry = new ("SPparameter",support = 0.05, maxsize = 1, maxgap = 28800, maxlen=4)
 wzorce= cspade(dseq, parametry, control = list(verbose = TRUE, tidLists = FALSE, summary= TRUE))
 #odkrycie regu³
 reguly = ruleInduction(wzorce,confidence = 0.8)
 
 #podsumowanie, przyk³ad
 length(reguly)
-summary(reguly)
 inspect(head(reguly,30))
-reguly@elements@items@itemInfo
 
 #wyszukanie regu³ interesuj¹cych - zdarzeñ 
 hipoglik=subset(reguly, !(lhs(reguly) %in% c("\"Objawy hipoglikemii\"")) & rhs(reguly) %in% c("\"Objawy hipoglikemii\""))
