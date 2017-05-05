@@ -88,8 +88,94 @@ df <-base.df %>%
 new_id <- df %>%arrange(description) %>% distinct(description)
 new_id$id <- seq.int(nrow(new_id))
 df = inner_join(df, new_id)
+length(unique(df$patient_id))
 View(df)
 
+#zapisanie data.frame do pliku aby wygodnie wczyta³o siê g jako sewkencjê
+write.table(df[,c(1,2,3)], file = "data/clean_data.csv", row.names=FALSE,col.names=FALSE, sep=",")
 
+#wczytanie z pliku w postaci sekwencyjnej 
+dseq <- read_baskets(con = "data/clean_data.csv", sep =",", info = c("sequenceID","eventID"))
+summary(dseq)
+#test, czy wczytanie jest poprawne
+frameS =   as(dseq,"data.frame")
+View(frameS)
 
+#liczba ró¿nych zdarzeñ
+nitems(dseq)
 
+#czêstoœæ zdarzeñ 
+freqItem = itemFrequency(dseq)
+freqItem = sort(freqItem, decreasing = TRUE )
+freqItem
+head(freqItem,30)
+#wsparcie objawów hipoglikemii to ~0,11 dlatego zaczniemy rozwa¿ania od wsparcia = 0.1
+
+#ustawienie parametrów
+#parametry: 
+#support=0.05: wsparcie ustawiamy doœæ nisko, ¿eby "z³apaæ" tak¿e regu³y zwi¹zane z wydarzeniami, które wydarzaj¹ siê rzadko
+#maxsize = 1 wszystkie "koszyki" to jednorazowe zdarzenia, dlatego mo¿na zastosowaæ maxsize=1
+#maxgap = 28800 w tym wypadku interesuj¹ nas zdarzenia, które wystêpuj¹ w zakresie 8 godzin
+#maxlen = 4 kompromis miêdzy liczb¹ wyszukanych regu³ a czasem wykonania algorytymu. 
+parametry = new ("SPparameter",support = 0.05, maxsize = 1, maxgap = 28800, maxlen = 4 )
+wzorce= cspade(dseq, parametry, control = list(verbose = TRUE, tidLists = FALSE, summary= TRUE))
+#odkrycie regu³
+reguly = ruleInduction(wzorce,confidence = 0.8)
+
+#podsumowanie, przyk³ad
+length(reguly)
+summary(reguly)
+inspect(head(reguly,30))
+reguly@elements@items@itemInfo
+
+#wyszukanie regu³ interesuj¹cych - zdarzeñ 
+hipoglik=subset(reguly, !(lhs(reguly) %in% c("\"Objawy hipoglikemii\"")) & rhs(reguly) %in% c("\"Objawy hipoglikemii\""))
+hipoglik = sort(hipoglik, by = "lift", decreasing=TRUE)
+inspect(hipoglik)
+
+#uzyskane regu³y dla parametrów: support = 0.05, maxsize = 1, maxgap = 28800, maxlen = 4 )
+'
+ 1 <{"Dawka insuliny regularnej poziom wysoki"},                                                                                                       
+     {"Pomiar zawartoœci glukozy we krwi przed obiadem poziom niski"},                                                                                  
+{"Pomiar zawartoœci glukozy we krwi przed kolacj¹ poziom niski"}>     => <{"Objawy hipoglikemii"}>                                              0.06060606  1.0000000 1.783784 
+2 <{"Dawka insuliny NPH poziom niski"},                                                                                                               
+{"Dawka insuliny NPH poziom normalny"},                                                                                                            
+{"Nieokreœlony pomiar zawartoœci glukozy we krwi poziom niski"}>      => <{"Objawy hipoglikemii"}>                                              0.09090909  1.0000000 1.783784 
+3 <{"Pomiar zawartoœci glukozy we krwi po kolacji poziom normalny"},                                                                                  
+{"Dawka insuliny NPH poziom normalny"},                                                                                                            
+{"Nieokreœlony pomiar zawartoœci glukozy we krwi poziom niski"}>      => <{"Objawy hipoglikemii"}>                                              0.07575758  1.0000000 1.783784 
+4 <{"Dawka insuliny NPH poziom niski"},                                                                                                               
+{"Dawka insuliny regularnej poziom niski"},                                                                                                        
+{"Nieokreœlony pomiar zawartoœci glukozy we krwi poziom niski"}>      => <{"Objawy hipoglikemii"}>                                              0.07575758  1.0000000 1.783784 
+5 <{"Pomiar zawartoœci glukozy we krwi po kolacji poziom normalny"},                                                                                  
+{"Dawka insuliny regularnej poziom niski"},                                                                                                        
+{"Nieokreœlony pomiar zawartoœci glukozy we krwi poziom niski"}>      => <{"Objawy hipoglikemii"}>                                              0.09090909  1.0000000 1.783784 
+6 <{"Dawka insuliny NPH poziom niski"},                                                                                                               
+{"Dawka insuliny regularnej poziom normalny"},                                                                                                     
+{"Nieokreœlony pomiar zawartoœci glukozy we krwi poziom niski"}>      => <{"Objawy hipoglikemii"}>                                              0.07575758  1.0000000 1.783784 
+7 <{"Dawka insuliny NPH poziom niski"},                                                                                                               
+{"Pomiar zawartoœci glukozy we krwi po kolacji poziom normalny"},                                                                                  
+{"Nieokreœlony pomiar zawartoœci glukozy we krwi poziom niski"}>      => <{"Objawy hipoglikemii"}>                                              0.06060606  1.0000000 1.783784 
+8 <{"Dawka insuliny regularnej poziom normalny"},                                                                                                     
+{"Pomiar zawartoœci glukozy we krwi po kolacji poziom normalny"},                                                                                  
+{"Nieokreœlony pomiar zawartoœci glukozy we krwi poziom niski"}>      => <{"Objawy hipoglikemii"}>                                              0.07575758  1.0000000 1.783784 
+9 <{"Pomiar zawartoœci glukozy we krwi przed kolacj¹ poziom normalny"},                                                                               
+{"Pomiar zawartoœci glukozy we krwi po kolacji poziom normalny"},                                                                                  
+{"Nieokreœlony pomiar zawartoœci glukozy we krwi poziom niski"}>      => <{"Objawy hipoglikemii"}>                                              0.06060606  1.0000000 1.783784 
+10 <{"Pomiar zawartoœci glukozy we krwi po kolacji poziom normalny"},                                                                                  
+{"Nieokreœlony pomiar zawartoœci glukozy we krwi poziom niski"}>      => <{"Objawy hipoglikemii"}>                                              0.09090909  0.8571429 1.528958 
+11 <{"Pomiar zawartoœci glukozy we krwi przed kolacj¹ poziom normalny"},                                                                               
+{"Dawka insuliny NPH poziom niski"},                                                                                                               
+{"Pomiar zawartoœci glukozy we krwi przed przek¹sk¹ poziom niski"}>   => <{"Objawy hipoglikemii"}>                                              0.06060606  0.8000000 1.427027 
+12 <{"Dawka insuliny NPH poziom niski"},                                                                                                               
+{"Pomiar zawartoœci glukozy we krwi przed obiadem poziom niski"}>     => <{"Objawy hipoglikemii"}>                                              0.06060606  0.8000000 1.427027 
+13 <{"Dawka insuliny regularnej poziom normalny"},                                                                                                     
+{"Dawka insuliny NPH poziom niski"},                                                                                                               
+{"Pomiar zawartoœci glukozy we krwi przed obiadem poziom niski"}>     => <{"Objawy hipoglikemii"}>                                              0.06060606  0.8000000 1.427027 
+14 <{"Pomiar zawartoœci glukozy we krwi przed œniadaniem poziom wysoki"},                                                                              
+{"Dawka insuliny NPH poziom niski"},                                                                                                               
+{"Pomiar zawartoœci glukozy we krwi przed obiadem poziom niski"}>     => <{"Objawy hipoglikemii"}>                                              0.06060606  0.8000000 1.427027 
+15 <{"Spo¿ycie posi³ku wiêkszego ni¿ zazwyczaj"},                                                                                                      
+{"Pomiar zawartoœci glukozy we krwi przed obiadem poziom niski"},                                                                                  
+{"Pomiar zawartoœci glukozy we krwi przed kolacj¹ poziom niski"}>     => <{"Objawy hipoglikemii"}>                                              0.06060606  0.8000000 1.427027 
+''
