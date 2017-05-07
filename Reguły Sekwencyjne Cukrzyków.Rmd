@@ -1,5 +1,5 @@
 ---
-title: "Regu³y Sekwencyjne dla pacentów chorych na cukrzycê."
+title: "Regu³y Sekwencyjne dla pacjentów chorych na cukrzycê."
 author: "Ludwik Przyrowski, Adam Kolipiñski"
 date: "3 kwietnia 2017"
 output:
@@ -141,3 +141,66 @@ df = inner_join(df, new_id)
 head(df)
 ```
 
+Zapisano data.frame do pliku .csv aby wygodnie wczyta³o siê dane w trybie sekwencyjnym
+```{r}
+write.table(df[,c(1,2,3)], file = "data/clean_data.csv", row.names=FALSE,col.names=FALSE, sep=",")
+```
+
+Wczytano dane w postaci z nowoutworzonego pliku
+```{r}
+dseq <- read_baskets(con = "data/clean_data.csv", sep =",", info = c("sequenceID","eventID"))
+```
+
+Test czy dane zosta³y wczytane poprawnie, przez ponown¹ transformacjê do data.frame
+```{r}
+frameS =   as(dseq,"data.frame")
+head(frameS)
+```
+
+Wstêpna analiza otrzymanych sekwencji
+liczba mo¿liwych elementów; czêstoœæ zdarzeñ:
+```{r}
+nitems(dseq)
+freqItem = itemFrequency(dseq)
+freqItem = sort(freqItem, decreasing = TRUE )
+freqItem
+head(freqItem,30)
+```
+
+Wsparcie objawów hipoglikemii to ~0,11 dlatego zaczniemy rozwa¿ania od wsparcia = 0.1
+Po testach proponujemy nastêpuj¹ce parametry algorytym cspade:
+support=0.05: wsparcie ustawiamy doœæ nisko, ¿eby "z³apaæ" tak¿e regu³y zwi¹zane z wydarzeniami, które wydarzaj¹ siê rzadko
+maxsize = 1 wszystkie "koszyki" to jednorazowe zdarzenia, dlatego mo¿na zastosowaæ maxsize=1
+maxgap = 28800 w tym wypadku interesuj¹ nas zdarzenia, które wystêpuj¹ w zakresie 8 godzin
+maxlen = 4 zdarzenia w obrêbie max 8 godzin daj¹ ³¹czny zakres objawów w ramach doby, co wydaje siê rozs¹dn¹ granic¹ dla hipoglikemii 
+maxwin - w algorytmie cspade pakietu arulesSequences ma status "disabled", dlatego nie mo¿emy go u¿yæ.
+
+Nastêpnie wyszukamy wzorce czêste i regu³y sekwencyjne
+```{r}
+parametry = new ("SPparameter",support = 0.05, maxsize = 1, maxgap = 28800, maxlen=4)
+wzorce= cspade(dseq, parametry, control = list(verbose = TRUE, tidLists = FALSE, summary= TRUE))
+#odkrycie regu³
+reguly = ruleInduction(wzorce,confidence = 0.8)
+```
+
+Liczba i podgl¹d otrzymanych regu³
+```{r}
+length(reguly)
+inspect(head(reguly,10))
+```
+
+Ograniczamy siê do regu³ nas interesuj¹cych - tych które maj¹ "objawy hipoglikemii" po prawej, ale nie po lewej stronie. Sortujemy je wed³ug wielkoœci wspó³czynnika lift. 
+```{r}
+hipoglik=subset(reguly, !(lhs(reguly) %in% c("\"Objawy hipoglikemii\"")) & rhs(reguly) %in% c("\"Objawy hipoglikemii\""))
+hipoglik = sort(hipoglik, by = "lift", decreasing=TRUE)
+inspect(hipoglik)
+```
+Otrzymaliœmy 15 wzorcóW sekwencyjnych, które mog¹ pos³u¿yæ do szybkiego wykrycia i zapobie¿enia obajwów hipoglikemii. 
+W wiêkszoœci wypadków ostatnim zdarzeniem bezpoœrednio przed wyst¹pieniem objawów by³ pomiar wskazuj¹cy na niski poziom glukozy we krwi, zw³aœzcza "nieokreœlony" - a wiêc wykonany ad hoc - nie zwi¹zany z posi³kiem. Œwiadczy to o tym, ¿e pacjenci byli œwiadomi swojego stanu, ale nie mogli, b¹dŸ nie uda³o im sie hipoglikemii zapobiec. 
+
+Szczególnie interesuj¹c¹ odkryt¹ regu³¹ jest regu³a ostatnia, jako jedyna zwi¹zana z nawykami ¿ywieniowymi. 
+ <{"Spo¿ycie posi³ku wiêkszego ni¿ zazwyczaj"},                  
+{"Pomiar zawartoœci glukozy we krwi przed obiadem poziom niski"},
+{"Pomiar zawartoœci glukozy we krwi przed kolacj¹ poziom niski"}>     
+=> <{"Objawy hipoglikemii"}>
+Œwiadczy ona o tym, ¿e zbyt du¿e œniadanie, w po³¹czeniu z utrzymuj¹c¹ siê nisk¹ zawartoœci¹ glukozy we krwi, mo¿e byæ niebezpieczne dla pacjentów! Byæ mo¿e wypada³oby uczuliæ ich na tak¹ mo¿liwoœæ w czasie wywiadu. 
